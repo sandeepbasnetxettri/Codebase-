@@ -11,7 +11,7 @@ function paisaToAmount(paisa: bigint) {
 }
 function amountToPaisa(value: string): bigint | null {
   const normalized = value.replace(/,/g, "").trim();
-  if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized)) return null;
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
   const [whole, fraction = ""] = normalized.split(".");
   return BigInt(whole) * 100n + BigInt((fraction + "00").slice(0, 2));
 }
