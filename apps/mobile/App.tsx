@@ -11,7 +11,7 @@ export default function App() {
   const [transactions, setTransactions] = useState<Tx[]>([]); const [busy, setBusy] = useState(false);
   const [qrAmount,setQrAmount]=useState(""); const [qrCode,setQrCode]=useState(""); const [payQrCode,setPayQrCode]=useState("");
   const [phone,setPhone]=useState(""); const [serviceAmount,setServiceAmount]=useState(""); const [billAmount,setBillAmount]=useState(""); const [customerRef,setCustomerRef]=useState("");
-  const [kycName,setKycName]=useState(""); const [kycDob,setKycDob]=useState(""); const [kycDoc,setKycDoc]=useState(""); const [kycAddress,setKycAddress]=useState(""); const [adminSummary,setAdminSummary]=useState("");
+  const [kycName,setKycName]=useState(""); const [kycDob,setKycDob]=useState(""); const [kycDoc,setKycDoc]=useState(""); const [kycAddress,setKycAddress]=useState(""); const [adminSummary,setAdminSummary]=useState(""); const [adminKyc,setAdminKyc]=useState<any[]>([]);
   async function loadTransactions() {
     const data = await request<{ transactions: Tx[] }>("/api/wallet/transactions");
     setTransactions(data.transactions);
@@ -29,7 +29,8 @@ export default function App() {
   async function recharge(){ const r=await action("/api/services/recharge",{operator:"NTC",phone,amount:Number(serviceAmount)}); if(r)await loadTransactions(); }
   async function payBill(){ const r=await action("/api/services/bills",{category:"NEA_ELECTRICITY",customerRef,amount:Number(billAmount)}); if(r)await loadTransactions(); }
   async function submitKyc(){ await action("/api/services/kyc",{fullName:kycName,dateOfBirth:kycDob,documentType:"CITIZENSHIP",documentNumber:kycDoc,address:kycAddress}); }
-  async function loadAdmin(){ try { const r=await request<any>("/api/admin/overview"); setAdminSummary(JSON.stringify(r)); } catch(e){notify((e as Error).message);} }
+  async function loadAdmin(){ try { const r=await request<any>("/api/admin/overview"); const k=await request<any>("/api/admin/kyc"); setAdminSummary(`Users: ${r.users} · Pending KYC: ${r.pendingKyc} · Pending QR: ${r.pendingQrPayments}`); setAdminKyc(k.applications); } catch(e){notify((e as Error).message);} }
+  async function reviewKyc(id:string,status:"APPROVED"|"REJECTED"){ try { await request(`/api/admin/kyc/${id}`,{method:"PATCH",body:JSON.stringify({status})}); await loadAdmin(); } catch(e){notify((e as Error).message);} }
   async function sendTransfer() {
     const n = Number(amount);
     if (!recipientEmail || !Number.isFinite(n) || n <= 0) return notify("Enter recipient email and a valid amount.");
@@ -98,7 +99,7 @@ export default function App() {
       <TouchableOpacity style={styles.primary} onPress={submitKyc}><Text style={styles.primaryText}>Submit demo KYC</Text></TouchableOpacity>
       <Text style={styles.muted}>Never enter real identity data in this prototype.</Text>
     </View>
-    {session.user.role === "ADMIN" ? <View style={styles.card}><Text style={styles.sectionTitle}>Admin dashboard</Text><TouchableOpacity style={styles.primary} onPress={loadAdmin}><Text style={styles.primaryText}>Load admin overview</Text></TouchableOpacity>{adminSummary ? <Text style={styles.muted}>{adminSummary}</Text> : null}</View> : null}
+    {session.user.role === "ADMIN" ? <View style={styles.card}><Text style={styles.sectionTitle}>Admin dashboard</Text><TouchableOpacity style={styles.primary} onPress={loadAdmin}><Text style={styles.primaryText}>Load admin overview</Text></TouchableOpacity>{adminSummary ? <Text style={styles.muted}>{adminSummary}</Text> : null}{adminKyc.map(k=><View key={k.id} style={styles.txRow}><View style={{flex:1}}><Text style={styles.txTitle}>{k.fullName} · {k.user.email}</Text><Text style={styles.muted}>{k.documentType} · {k.status}</Text></View>{k.status==="PENDING" ? <><TouchableOpacity onPress={()=>reviewKyc(k.id,"APPROVED")}><Text style={styles.credit}>Approve</Text></TouchableOpacity><TouchableOpacity onPress={()=>reviewKyc(k.id,"REJECTED")}><Text style={styles.debit}>Reject</Text></TouchableOpacity></> : null}</View>)}</View> : null}
     <Text style={styles.sectionTitle}>Recent transactions</Text><View style={styles.card}>
       {transactions.length === 0 ? <Text style={styles.muted}>No transactions yet.</Text> : transactions.map(tx => <View key={tx.id} style={styles.txRow}>
         <View style={styles.txIcon}><Text style={styles.txIconText}>{tx.direction === "CREDIT" ? "↓" : "↑"}</Text></View>
