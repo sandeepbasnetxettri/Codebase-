@@ -1,4 +1,4 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4000";
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4000";
 export type Session = { accessToken: string; user: { id: string; name: string; email: string; role: string; wallet?: { currency: string; balancePaisa: string } | null } };
 let accessToken = "";
 export function setAccessToken(value: string) { accessToken = value; }
