@@ -33,10 +33,12 @@ package.json
 Copy the root environment template:
 
 ```bash
-cp .env.example .env
+cp .env.example apps/api/.env
+# Create apps/mobile/.env containing:
+# EXPO_PUBLIC_API_URL=http://localhost:4000
 ```
 
-Set a long random `JWT_SECRET` and the PostgreSQL connection string. Never commit `.env`.
+Set a long random `JWT_SECRET` and the PostgreSQL connection string in `apps/api/.env`. For Expo, create `apps/mobile/.env` and set `EXPO_PUBLIC_API_URL`. Never commit either environment file.
 
 ## 2. Start PostgreSQL
 
