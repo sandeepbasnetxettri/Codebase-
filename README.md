@@ -150,3 +150,41 @@ This is only workflow scaffolding. Rule-based high-value flags are not a complia
 
 ## Approved payment provider integration
 The provider adapter is intentionally a boundary only. A real implementation cannot be safely completed without the exact provider, approved merchant agreement, official API documentation, sandbox credentials, signing/webhook specification and settlement/reconciliation rules. Do not send credentials in chat or commit them to Git. Never treat a browser redirect or client-side callback as proof of payment.
+
+
+## eSewa ePay v2 integration (merchant checkout)
+
+The repository now includes eSewa ePay v2 sandbox/production configuration, HMAC-SHA256 request signing, a hosted checkout handoff page, signed success-response validation, and server-to-server transaction status verification.
+
+### Configure
+
+Copy `.env.example` to `apps/api/.env` and set:
+
+```env
+ESEWA_ENV=sandbox
+ESEWA_PRODUCT_CODE=EPAYTEST
+ESEWA_SECRET_KEY=your-eSewa-issued-secret
+API_PUBLIC_URL=https://your-public-api-domain.example
+```
+
+Use the sandbox product code and secret supplied in eSewa's official UAT documentation for testing. For production, use only the product code and secret issued for your approved merchant account and set `ESEWA_ENV=production`. Keep the secret only in the API runtime environment/secret manager; never put it in Expo variables, source code, or Git.
+
+`API_PUBLIC_URL` must be a publicly reachable HTTPS API origin for eSewa's success/failure redirects. Do not leave it as localhost outside local development.
+
+### Checkout flow
+
+- `POST /api/services/esewa/initiate` (authenticated; JSON body `{"amount": 100}`) creates a pending payment and returns a transaction UUID.
+- The mobile app opens `/api/services/esewa/checkout/:transactionUuid`, a hosted form that POSTs to eSewa's official checkout URL.
+- eSewa redirects to `GET /api/services/esewa/success`; the API validates the signed Base64 response and independently checks the transaction with eSewa's status API.
+- `GET /api/services/esewa/status/:transactionUuid` (authenticated) lets the app refresh the server-verified status.
+
+Run the database migration after pulling this change:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+### Important scope and limits
+
+This integration records the result of a merchant ePay checkout. **It does not credit the user's wallet balance**, perform cash-in settlement, or prove that this independent app is authorized to operate a stored-value wallet. eSewa ePay is a merchant collection flow; wallet funding/disbursement requires separate legal/regulatory approval and settlement design. Do not accept real customer funds until eSewa approves the merchant use case and the app has passed security, reconciliation, and Nepal regulatory reviews. The code has been committed but has not yet been installed, compiled, migrated, or tested against the eSewa sandbox.
