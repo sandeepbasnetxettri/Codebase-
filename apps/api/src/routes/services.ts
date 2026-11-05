@@ -17,6 +17,25 @@ async function debit(userId: string, amount: number, description: string) {
     return ref;
   });
 }
+
+router.post("/cash-in", async (req: AuthRequest, res, next) => {
+ const p=z.object({amount:amountSchema,method:z.enum(["BANK_TRANSFER","COUNTER_DEPOSIT"]),reference:z.string().max(80).optional()}).safeParse(req.body);
+ if(!p.success)return res.status(400).json({error:"Invalid cash-in request"});
+ try{const amountPaisa=BigInt(Math.round(p.data.amount*100));const item=await prisma.cashRequest.create({data:{userId:req.userId!,type:"CASH_IN",amountPaisa,method:p.data.method,reference:p.data.reference}});
+ if(p.data.amount>=100000)await prisma.amlCase.create({data:{userId:req.userId!,reason:"High-value cash-in request",riskLevel:"HIGH",details:"Manual review required"}});
+ res.status(201).json({id:item.id,status:item.status,message:"Queued for review. No funds credited."});}catch(e){next(e);}
+});
+router.post("/cash-out", async (req: AuthRequest, res, next) => {
+ const p=z.object({amount:amountSchema,method:z.enum(["BANK_TRANSFER","COUNTER_PICKUP"]),destination:z.string().min(4).max(120)}).safeParse(req.body);
+ if(!p.success)return res.status(400).json({error:"Invalid cash-out request"});
+ try{const amountPaisa=BigInt(Math.round(p.data.amount*100));const w=await prisma.wallet.findUnique({where:{userId:req.userId!}});
+ if(!w||w.balancePaisa<amountPaisa)return res.status(400).json({error:"Insufficient demo balance"});
+ const item=await prisma.cashRequest.create({data:{userId:req.userId!,type:"CASH_OUT",amountPaisa,method:p.data.method,reference:p.data.destination}});
+ if(p.data.amount>=100000)await prisma.amlCase.create({data:{userId:req.userId!,reason:"High-value cash-out request",riskLevel:"HIGH",details:"Manual review required"}});
+ res.status(201).json({id:item.id,status:item.status,message:"Queued for review. No cash is disbursed."});}catch(e){next(e);}
+});
+router.get("/cash-requests",async(req:AuthRequest,res,next)=>{try{const items=await prisma.cashRequest.findMany({where:{userId:req.userId!},orderBy:{createdAt:"desc"},take:30});res.json({requests:items.map(x=>({...x,amountPaisa:x.amountPaisa.toString()}))});}catch(e){next(e);}});
+
 router.post("/qr/create", async (req: AuthRequest, res, next) => {
   const parsed = z.object({ amount: amountSchema, note: z.string().max(100).optional() }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Enter a valid amount (maximum two decimals)." });
