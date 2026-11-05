@@ -25,7 +25,7 @@ router.get("/transactions", async (req: AuthRequest, res, next) => {
 router.post("/transfers", async (req: AuthRequest, res, next) => {
   const parsed = z.object({
     recipientEmail: z.string().email().transform(v => v.toLowerCase()),
-    amount: z.number().positive().max(100000).refine(v => Number.isInteger(v * 100), "Maximum two decimal places"),
+    amount: z.number().positive().max(100000).refine(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8, "Maximum two decimal places"),
     note: z.string().trim().max(120).optional()
   }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid transfer details", details: parsed.error.flatten() });
