@@ -21,7 +21,7 @@ router.post("/register", async (req, res, next) => {
         wallet: { create: { currency: "NPR", balancePaisa: 100000n } },
         sentEntries: { create: { transferRef: `WELCOME-${Date.now()}`, amountPaisa: 100000n, direction: "CREDIT", description: "Demo welcome credits" } }
       },
-      select: { id: true, name: true, email: true, wallet: { select: { balancePaisa: true, currency: true } } }
+      select: { id: true, name: true, email: true, role: true, wallet: { select: { balancePaisa: true, currency: true } } }
     });
     res.status(201).json({ accessToken: tokenFor(user.id), user: { ...user, wallet: user.wallet ? { ...user.wallet, balancePaisa: user.wallet.balancePaisa.toString() } : null } });
   } catch (error: any) {
@@ -35,7 +35,7 @@ router.post("/login", async (req, res, next) => {
     if (!parsed.success) return res.status(400).json({ error: "Invalid email or password" });
     const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, include: { wallet: true } });
     if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) return res.status(401).json({ error: "Email or password is incorrect" });
-    res.json({ accessToken: tokenFor(user.id), user: { id: user.id, name: user.name, email: user.email, wallet: user.wallet ? { currency: user.wallet.currency, balancePaisa: user.wallet.balancePaisa.toString() } : null } });
+    res.json({ accessToken: tokenFor(user.id), user: { id: user.id, name: user.name, email: user.email, role: user.role, wallet: user.wallet ? { currency: user.wallet.currency, balancePaisa: user.wallet.balancePaisa.toString() } : null } });
   } catch (error) { next(error); }
 });
 export default router;
