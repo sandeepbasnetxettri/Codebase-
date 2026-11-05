@@ -35,6 +35,7 @@ router.post("/login", async (req, res, next) => {
     if (!parsed.success) return res.status(400).json({ error: "Invalid email or password" });
     const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, include: { wallet: true } });
     if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) return res.status(401).json({ error: "Email or password is incorrect" });
+    if (user.status !== "ACTIVE") return res.status(403).json({ error: "Account is restricted. Contact support." });
     res.json({ accessToken: tokenFor(user.id), user: { id: user.id, name: user.name, email: user.email, role: user.role, wallet: user.wallet ? { currency: user.wallet.currency, balancePaisa: user.wallet.balancePaisa.toString() } : null } });
   } catch (error) { next(error); }
 });
