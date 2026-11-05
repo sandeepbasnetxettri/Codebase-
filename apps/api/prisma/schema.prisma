@@ -117,6 +117,7 @@ model EsewaPayment {
   amountPaisa BigInt
   productCode String
   status String @default("PENDING")
+  walletCredited Boolean @default(false)
   providerRef String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
