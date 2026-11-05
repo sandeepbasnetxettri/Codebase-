@@ -41,6 +41,24 @@ router.get("/esewa/success", async (req, res) => {
 
 router.get("/esewa/failure", (_req, res) => res.status(200).send("eSewa payment was cancelled, failed, or is still pending. Check the payment status in the app."));
 
+
+router.get("/esewa/checkout/:transactionUuid", async (req, res) => {
+  try {
+    const payment = await prisma.esewaPayment.findUnique({ where: { transactionUuid: req.params.transactionUuid } });
+    if (!payment || payment.status !== "PENDING") return res.status(404).send("Pending eSewa payment not found");
+    const checkout = createEsewaForm({ amount: paisaToAmount(payment.amountPaisa), transactionUuid: payment.transactionUuid });
+    const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const inputs = Object.entries(checkout.fields).map(([name, value]) =>
+      `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}">`
+    ).join("");
+    res.setHeader("Cache-Control", "no-store");
+    res.type("html").send(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Continue to eSewa</title></head><body style="font-family:system-ui;max-width:480px;margin:48px auto;padding:20px"><h2>Continue to eSewa</h2><p>Amount: NPR ${paisaToAmount(payment.amountPaisa)}</p><p>Transaction: ${escapeHtml(payment.transactionUuid)}</p><form method="POST" action="${checkout.actionUrl}">${inputs}<button style="padding:14px 22px;background:#087d55;color:white;border:0;border-radius:8px;font-size:16px">Pay with eSewa</button></form><p>After payment, return to the app and check the transaction status.</p></body></html>`);
+  } catch (error) {
+    console.error("eSewa checkout page failed", error);
+    res.status(500).send("Could not prepare eSewa checkout");
+  }
+});
+
 router.use(requireAuth);
 const amountSchema = z.number().positive().max(50000).refine(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8);
 async function debit(userId: string, amount: number, description: string) {
