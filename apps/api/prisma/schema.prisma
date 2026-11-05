@@ -11,11 +11,15 @@ model User {
   email           String        @unique
   passwordHash    String
   role            String        @default("USER")
+  status          String        @default("ACTIVE")
   createdAt       DateTime      @default(now())
   wallet          Wallet?
   sentEntries     LedgerEntry[] @relation("LedgerOwner")
   counterEntries  LedgerEntry[] @relation("LedgerCounterparty")
   kyc             KycApplication?
+  cashRequests    CashRequest[]
+  amlCases        AmlCase[]
+  auditEvents     AuditEvent[] @relation("AuditActor")
 }
 model Wallet {
   id           String   @id @default(cuid())
@@ -64,4 +68,43 @@ model PaymentRequest {
   expiresAt   DateTime
   createdAt   DateTime @default(now())
   @@index([userId, createdAt])
+}
+
+model CashRequest {
+  id String @id @default(cuid())
+  userId String
+  type String
+  amountPaisa BigInt
+  method String
+  reference String?
+  status String @default("PENDING")
+  reviewNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+model AmlCase {
+  id String @id @default(cuid())
+  userId String
+  reason String
+  riskLevel String @default("MEDIUM")
+  status String @default("OPEN")
+  details String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([status, createdAt])
+}
+model AuditEvent {
+  id String @id @default(cuid())
+  actorId String
+  action String
+  targetType String
+  targetId String
+  details String?
+  createdAt DateTime @default(now())
+  actor User @relation("AuditActor", fields: [actorId], references: [id])
+  @@index([targetType, targetId, createdAt])
 }
