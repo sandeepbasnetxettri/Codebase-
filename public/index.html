@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#087d55">
+  <title>Wallet Nepal — Demo</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">W</span> Wallet<span>Nepal</span></a>
+    <div class="top-actions"><span class="demo-tag">DEMO MODE</span><button id="logoutBtn" class="ghost hidden">Sign out</button></div>
+  </header>
+  <main class="shell">
+    <section id="authView" class="auth-layout">
+      <div class="intro">
+        <p class="eyebrow">A DIGITAL WALLET CONCEPT</p>
+        <h1>Money moves.<br><span>Life gets simpler.</span></h1>
+        <p>A Nepal-focused wallet demo for exploring balances, transfers and transaction history. No real money is involved.</p>
+        <div class="trust-note">🔒 Demo accounts · NPR currency · Local database</div>
+      </div>
+      <div class="panel auth-panel">
+        <div class="tabs"><button class="tab active" data-tab="login">Sign in</button><button class="tab" data-tab="register">Create account</button></div>
+        <form id="loginForm" class="auth-form">
+          <h2>Welcome back</h2><label>Email address<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" required placeholder="Your password"></label>
+          <button class="primary" type="submit">Sign in <span>→</span></button>
+        </form>
+        <form id="registerForm" class="auth-form hidden">
+          <h2>Create your wallet</h2><label>Full name<input name="name" required minlength="2" maxlength="70" placeholder="Your name"></label>
+          <label>Email address<input name="email" type="email" required placeholder="you@example.com"></label>
+          <label>Password<input name="password" type="password" minlength="10" required placeholder="At least 10 characters"></label>
+          <button class="primary" type="submit">Create account <span>→</span></button>
+          <small>New demo accounts receive NPR 1,000 in test credits.</small>
+        </form>
+        <p id="authMessage" class="message" role="status"></p>
+      </div>
+    </section>
+
+    <section id="dashboardView" class="hidden">
+      <div class="welcome-row"><div><p class="eyebrow">YOUR WALLET</p><h1>Hello, <span id="userName">there</span> 👋</h1><p class="muted">Here's your demo wallet overview.</p></div><div class="date-chip">🇳🇵 Nepal · NPR</div></div>
+      <div class="balance-card">
+        <div><p>Available demo balance</p><div class="balance" id="balance">NPR 0.00</div><span class="balance-caption">Test credits only — not withdrawable</span></div>
+        <div class="balance-symbol">रु</div>
+      </div>
+      <div class="section-heading"><div><p class="eyebrow">QUICK ACTIONS</p><h2>What would you like to do?</h2></div></div>
+      <div class="action-grid">
+        <button class="action-card" id="sendAction"><span class="action-icon purple">↗</span><b>Send money</b><small>Transfer demo credits</small></button>
+        <button class="action-card" id="qrAction"><span class="action-icon blue">▦</span><b>QR payment</b><small>Preview only</small></button>
+        <button class="action-card" id="topupAction"><span class="action-icon orange">＋</span><b>Mobile top-up</b><small>Not connected</small></button>
+        <button class="action-card" id="billsAction"><span class="action-icon green">▤</span><b>Pay bills</b><small>Not connected</small></button>
+      </div>
+      <div class="content-grid">
+        <section class="panel transfer-panel" id="transferPanel">
+          <div class="panel-title"><div><p class="eyebrow">WALLET TRANSFER</p><h2>Send demo money</h2></div><span class="round-icon">↗</span></div>
+          <form id="transferForm">
+            <label>Recipient email<input name="recipientEmail" type="email" required placeholder="friend@example.com"></label>
+            <label>Amount (NPR)<div class="amount-input"><span>रु</span><input name="amount" type="number" min="0.01" max="100000" step="0.01" required placeholder="0.00"></div></label>
+            <label>Note <span class="optional">(optional)</span><input name="note" maxlength="120" placeholder="What's it for?"></label>
+            <button class="primary" type="submit">Review demo transfer <span>→</span></button>
+          </form>
+          <p id="transferMessage" class="message" role="status"></p>
+        </section>
+        <section class="panel history-panel"><div class="panel-title"><div><p class="eyebrow">YOUR ACTIVITY</p><h2>Recent transactions</h2></div><span class="round-icon">↕</span></div><div id="transactions" class="transactions"><p class="muted">Sign in to see activity.</p></div></section>
+      </div>
+      <p class="disclaimer">This is an independent demonstration project. It is not affiliated with, endorsed by, or connected to eSewa. No real payments, deposits or withdrawals are processed.</p>
+    </section>
+  </main>
+  <footer>© 2026 Wallet Nepal Demo <span>Built for learning · Not a real payment service</span></footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>
