@@ -33,6 +33,8 @@ router.post("/qr/pay", async (req: AuthRequest, res, next) => {
     if (!request || request.status !== "PENDING" || request.expiresAt < new Date()) return res.status(404).json({ error: "QR request unavailable or expired" });
     if (request.userId === req.userId) return res.status(400).json({ error: "You cannot pay your own QR request" });
     await prisma.$transaction(async tx => {
+      const claimed = await tx.paymentRequest.updateMany({ where: { id: request.id, status: "PENDING", expiresAt: { gt: new Date() } }, data: { status: "PROCESSING" } });
+      if (claimed.count !== 1) throw new Error("QR_UNAVAILABLE");
       const payer = await tx.wallet.findUnique({ where: { userId: req.userId! } });
       if (!payer || payer.balancePaisa < request.amountPaisa) throw new Error("INSUFFICIENT_FUNDS");
       await tx.wallet.update({ where: { userId: req.userId! }, data: { balancePaisa: { decrement: request.amountPaisa } } });
@@ -45,7 +47,7 @@ router.post("/qr/pay", async (req: AuthRequest, res, next) => {
       await tx.paymentRequest.update({ where: { id: request.id }, data: { status: "PAID" } });
     });
     res.json({ status: "DEMO_PAID", amountPaisa: request.amountPaisa.toString(), message: "No real money moved." });
-  } catch (e: any) { if (e.message === "INSUFFICIENT_FUNDS") return res.status(400).json({ error: "Insufficient demo balance" }); next(e); }
+  } catch (e: any) { if (e.message === "INSUFFICIENT_FUNDS") return res.status(400).json({ error: "Insufficient demo balance" }); if (e.message === "QR_UNAVAILABLE") return res.status(409).json({ error: "QR request was already paid or expired" }); next(e); }
 });
 router.post("/recharge", async (req: AuthRequest, res, next) => {
   const parsed = z.object({ operator: z.enum(["NTC", "Ncell", "SmartCell"]), phone: z.string().regex(/^(\+977)?9[0-9]{9}$/), amount: amountSchema }).safeParse(req.body);
