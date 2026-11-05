@@ -40,8 +40,15 @@ export default function App() {
   }
   async function checkEsewaPayment(){
     if(!esewaTxn)return;
-    try { const result=await request<any>(`/api/services/esewa/status/${encodeURIComponent(esewaTxn)}`); notify(`eSewa status: ${result.status}`); }
-    catch(e) { notify((e as Error).message); }
+    try {
+      const result=await request<any>(`/api/services/esewa/status/${encodeURIComponent(esewaTxn)}`);
+      if(result.walletCredited){
+        const wallet=await request<{balancePaisa:string;currency:string}>("/api/wallet");
+        setSession(current=>current?{...current,user:{...current.user,wallet:{balancePaisa:wallet.balancePaisa,currency:wallet.currency}}}:current);
+        await loadTransactions();
+      }
+      notify(result.walletCredited?"eSewa payment verified. Wallet balance updated.":`eSewa status: ${result.status}`);
+    } catch(e) { notify((e as Error).message); }
   }
   async function loadAdmin(){ try { const r=await request<any>("/api/admin/overview"); const k=await request<any>("/api/admin/kyc"); const cash=await request<any>("/api/admin/cash-requests"); const aml=await request<any>("/api/admin/aml-cases"); setAdminSummary(`Users: ${r.users} · Pending KYC: ${r.pendingKyc} · Pending QR: ${r.pendingQrPayments}`); setAdminKyc(k.applications); setAdminCash(cash.requests); setAmlCases(aml.cases); } catch(e){notify((e as Error).message);} }
   async function reviewCash(id:string,status:"APPROVED"|"REJECTED"){try{await request(`/api/admin/cash-requests/${id}`,{method:"PATCH",body:JSON.stringify({status})});await loadAdmin();}catch(e){notify((e as Error).message);}}
