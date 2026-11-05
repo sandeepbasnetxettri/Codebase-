@@ -9,6 +9,12 @@ const router = Router();
 function paisaToAmount(paisa: bigint) {
   return `${paisa / 100n}.${String(paisa % 100n).padStart(2, "0")}`;
 }
+function amountToPaisa(value: string): bigint | null {
+  const normalized = value.replace(/,/g, "").trim();
+  if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized)) return null;
+  const [whole, fraction = ""] = normalized.split(".");
+  return BigInt(whole) * 100n + BigInt((fraction + "00").slice(0, 2));
+}
 
 // Credit a verified eSewa top-up exactly once. Payment state and wallet/ledger writes
 // share one database transaction, so partial settlement rolls back.
@@ -34,7 +40,7 @@ router.get("/esewa/success", async (req, res) => {
     const payment = await prisma.esewaPayment.findUnique({ where: { transactionUuid: response.transaction_uuid } });
     if (!payment) return res.status(404).send("Payment reference not found");
     if (response.product_code !== payment.productCode || response.product_code !== getEsewaProductCode() ||
-        Math.round(Number(response.total_amount) * 100) !== Number(payment.amountPaisa)) {
+        amountToPaisa(response.total_amount) !== payment.amountPaisa) {
       return res.status(400).send("eSewa response does not match the stored payment");
     }
     const verified = await checkEsewaStatus({ transactionUuid: payment.transactionUuid, totalAmount: paisaToAmount(payment.amountPaisa) });
