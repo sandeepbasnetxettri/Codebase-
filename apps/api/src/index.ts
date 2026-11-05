@@ -6,6 +6,8 @@ import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
 import authRoutes from "./routes/auth";
 import walletRoutes from "./routes/wallet";
+import servicesRoutes from "./routes/services";
+import adminRoutes from "./routes/admin";
 const app = express();
 export const prisma = new PrismaClient();
 const port = Number(process.env.PORT || 4000);
@@ -17,6 +19,8 @@ app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHe
 app.get("/health", (_req, res) => res.json({ status: "ok", mode: "demo-only" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/services", servicesRoutes);
+app.use("/api/admin", adminRoutes);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
