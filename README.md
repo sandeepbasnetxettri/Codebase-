@@ -1,6 +1,6 @@
 # Nepal Wallet Platform (Independent Demo)
 
-A React Native + Node.js monorepo for an independent Nepal-focused wallet prototype. It is **not eSewa's source code**, is not affiliated with eSewa, and does not connect to eSewa or any bank/payment network.
+A React Native + Node.js monorepo for an independent Nepal-focused wallet prototype. It is **not eSewa's source code** and is not affiliated with eSewa. It includes a gated eSewa ePay merchant-checkout integration; other bank, payout, biller and telecom rails are not connected.
 
 ## Project structure
 
@@ -97,7 +97,7 @@ PostgreSQL via Prisma. Main tables: `User`, `Wallet`, `LedgerEntry`. Wallet bala
 - New accounts receive NPR 1,000 of clearly labelled demo credits.
 - Transfers move only demo credits between accounts.
 - QR, cash-in/cash-out, mobile top-up, bill payment and card/bank rails are not connected.
-- There is no KYC, AML screening, sanctions screening, reconciliation, dispute handling, production monitoring, or regulator-approved custody.
+- KYC and AML screens are demo workflows only; there is no verified identity process, sanctions/PEP screening, suspicious-activity reporting, full reconciliation, dispute handling, production monitoring, or regulator-approved custody.
 - The demo API currently uses bearer access tokens; production needs refresh-token rotation, device/session management, MFA, audit and fraud controls.
 
 ## Real payment integration
