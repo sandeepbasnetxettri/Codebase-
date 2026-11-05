@@ -170,7 +170,7 @@ ESEWA_WALLET_TOPUP_ENABLED=false
 
 Use the sandbox product code and secret supplied in eSewa's official UAT documentation for testing. For production, use only the product code and secret issued for your approved merchant account and set `ESEWA_ENV=production`. Keep the secret only in the API runtime environment/secret manager; never put it in Expo variables, source code, or Git.
 
-`API_PUBLIC_URL` must be a publicly reachable HTTPS API origin for eSewa's success/failure redirects. Do not leave it as localhost outside local development.
+`API_PUBLIC_URL` must be a publicly reachable HTTPS API origin for eSewa's success/failure redirects. Do not leave it as localhost outside local development. For a controlled sandbox test only, set `ESEWA_WALLET_TOPUP_ENABLED=true` to exercise wallet crediting; keep it `false` until the production merchant use case and regulatory approvals are confirmed.
 
 ### Checkout flow
 
