@@ -10,10 +10,12 @@ model User {
   name            String
   email           String        @unique
   passwordHash    String
+  role            String        @default("USER")
   createdAt       DateTime      @default(now())
   wallet          Wallet?
   sentEntries     LedgerEntry[] @relation("LedgerOwner")
   counterEntries  LedgerEntry[] @relation("LedgerCounterparty")
+  kyc             KycApplication?
 }
 model Wallet {
   id           String   @id @default(cuid())
@@ -37,4 +39,29 @@ model LedgerEntry {
   counterparty   User?    @relation("LedgerCounterparty", fields: [counterpartyId], references: [id])
   @@index([userId, createdAt])
   @@index([transferRef])
+}
+model KycApplication {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  fullName       String
+  dateOfBirth    String
+  documentType   String
+  documentNumber String
+  address        String
+  status         String   @default("PENDING")
+  reviewNote     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+model PaymentRequest {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  userId      String
+  amountPaisa BigInt
+  note        String?
+  status      String   @default("PENDING")
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  @@index([userId, createdAt])
 }
