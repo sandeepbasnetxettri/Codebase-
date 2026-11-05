@@ -9,6 +9,9 @@ export default function App() {
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
   const [recipientEmail, setRecipientEmail] = useState(""); const [amount, setAmount] = useState(""); const [note, setNote] = useState("");
   const [transactions, setTransactions] = useState<Tx[]>([]); const [busy, setBusy] = useState(false);
+  const [qrAmount,setQrAmount]=useState(""); const [qrCode,setQrCode]=useState(""); const [payQrCode,setPayQrCode]=useState("");
+  const [phone,setPhone]=useState(""); const [serviceAmount,setServiceAmount]=useState(""); const [billAmount,setBillAmount]=useState(""); const [customerRef,setCustomerRef]=useState("");
+  const [kycName,setKycName]=useState(""); const [kycDob,setKycDob]=useState(""); const [kycDoc,setKycDoc]=useState(""); const [kycAddress,setKycAddress]=useState(""); const [adminSummary,setAdminSummary]=useState("");
   async function loadTransactions() {
     const data = await request<{ transactions: Tx[] }>("/api/wallet/transactions");
     setTransactions(data.transactions);
@@ -20,6 +23,13 @@ export default function App() {
       setAccessToken(data.accessToken); setSession(data); await loadTransactions();
     } catch (error) { notify((error as Error).message); } finally { setBusy(false); }
   }
+  async function action(path:string,body:any) { try { const result=await request<any>(path,{method:"POST",body:JSON.stringify(body)}); notify(result.message || result.status || "Demo request submitted"); return result; } catch(e) { notify((e as Error).message); return null; } }
+  async function createQr(){ const r=await action("/api/services/qr/create",{amount:Number(qrAmount)}); if(r?.code)setQrCode(r.code); }
+  async function payQr(){ const r=await action("/api/services/qr/pay",{code:payQrCode}); if(r)await loadTransactions(); }
+  async function recharge(){ const r=await action("/api/services/recharge",{operator:"NTC",phone,amount:Number(serviceAmount)}); if(r)await loadTransactions(); }
+  async function payBill(){ const r=await action("/api/services/bills",{category:"NEA_ELECTRICITY",customerRef,amount:Number(billAmount)}); if(r)await loadTransactions(); }
+  async function submitKyc(){ await action("/api/services/kyc",{fullName:kycName,dateOfBirth:kycDob,documentType:"CITIZENSHIP",documentNumber:kycDoc,address:kycAddress}); }
+  async function loadAdmin(){ try { const r=await request<any>("/api/admin/overview"); setAdminSummary(JSON.stringify(r)); } catch(e){notify((e as Error).message);} }
   async function sendTransfer() {
     const n = Number(amount);
     if (!recipientEmail || !Number.isFinite(n) || n <= 0) return notify("Enter recipient email and a valid amount.");
@@ -57,6 +67,38 @@ export default function App() {
       <Field label="Note (optional)" value={note} onChangeText={setNote} />
       <TouchableOpacity disabled={busy} onPress={sendTransfer} style={styles.primary}><Text style={styles.primaryText}>{busy ? "Processing…" : "Send demo transfer"}</Text></TouchableOpacity>
     </View>
+
+    <Text style={styles.sectionTitle}>QR payments · Recharge · Bills · KYC</Text>
+    <View style={styles.card}>
+      <Text style={styles.label}>Create a demo QR request</Text>
+      <Field label="Amount (NPR)" value={qrAmount} onChangeText={setQrAmount} keyboardType="decimal-pad" />
+      <TouchableOpacity style={styles.primary} onPress={createQr}><Text style={styles.primaryText}>Create QR code</Text></TouchableOpacity>
+      {qrCode ? <Text style={styles.muted}>Share this demo code: {qrCode}</Text> : null}
+      <Field label="Pay QR code" value={payQrCode} onChangeText={setPayQrCode} />
+      <TouchableOpacity style={styles.primary} onPress={payQr}><Text style={styles.primaryText}>Pay demo QR</Text></TouchableOpacity>
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.label}>Mobile recharge (demo only)</Text>
+      <Field label="Phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <Field label="Amount (NPR)" value={serviceAmount} onChangeText={setServiceAmount} keyboardType="decimal-pad" />
+      <TouchableOpacity style={styles.primary} onPress={recharge}><Text style={styles.primaryText}>Submit recharge demo</Text></TouchableOpacity>
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.label}>Bill payment (demo only)</Text>
+      <Field label="Customer / meter reference" value={customerRef} onChangeText={setCustomerRef} />
+      <Field label="Amount (NPR)" value={billAmount} onChangeText={setBillAmount} keyboardType="decimal-pad" />
+      <TouchableOpacity style={styles.primary} onPress={payBill}><Text style={styles.primaryText}>Submit bill demo</Text></TouchableOpacity>
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.label}>KYC application (test data only)</Text>
+      <Field label="Legal full name" value={kycName} onChangeText={setKycName} />
+      <Field label="Date of birth (YYYY-MM-DD)" value={kycDob} onChangeText={setKycDob} />
+      <Field label="Document number" value={kycDoc} onChangeText={setKycDoc} />
+      <Field label="Address" value={kycAddress} onChangeText={setKycAddress} />
+      <TouchableOpacity style={styles.primary} onPress={submitKyc}><Text style={styles.primaryText}>Submit demo KYC</Text></TouchableOpacity>
+      <Text style={styles.muted}>Never enter real identity data in this prototype.</Text>
+    </View>
+    {session.user.role === "ADMIN" ? <View style={styles.card}><Text style={styles.sectionTitle}>Admin dashboard</Text><TouchableOpacity style={styles.primary} onPress={loadAdmin}><Text style={styles.primaryText}>Load admin overview</Text></TouchableOpacity>{adminSummary ? <Text style={styles.muted}>{adminSummary}</Text> : null}</View> : null}
     <Text style={styles.sectionTitle}>Recent transactions</Text><View style={styles.card}>
       {transactions.length === 0 ? <Text style={styles.muted}>No transactions yet.</Text> : transactions.map(tx => <View key={tx.id} style={styles.txRow}>
         <View style={styles.txIcon}><Text style={styles.txIconText}>{tx.direction === "CREDIT" ? "↓" : "↑"}</Text></View>
