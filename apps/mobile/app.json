@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Wallet Nepal Demo",
+    "slug": "wallet-nepal-demo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": { "backgroundColor": "#087d55" },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.example.walletnepaldemo" },
+    "android": { "package": "com.example.walletnepaldemo" },
+    "web": { "bundler": "metro" }
+  }
+}
