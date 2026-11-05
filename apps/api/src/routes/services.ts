@@ -10,6 +10,20 @@ function paisaToAmount(paisa: bigint) {
   return `${paisa / 100n}.${String(paisa % 100n).padStart(2, "0")}`;
 }
 
+// Credit a verified eSewa top-up exactly once. Payment state and wallet/ledger writes
+// share one database transaction, so partial settlement rolls back.
+async function settleEsewaTopUp(paymentId: string, providerRef?: string) {
+  await prisma.$transaction(async tx => {
+    const claimed = await tx.esewaPayment.updateMany({ where: { id: paymentId, status: "PENDING" }, data: { status: "COMPLETE", providerRef: providerRef || null } });
+    if (claimed.count !== 1) return;
+    const payment = await tx.esewaPayment.findUnique({ where: { id: paymentId } });
+    if (!payment) throw new Error("eSewa payment disappeared during settlement");
+    const wallet = await tx.wallet.updateMany({ where: { userId: payment.userId }, data: { balancePaisa: { increment: payment.amountPaisa } } });
+    if (wallet.count !== 1) throw new Error("Wallet not found for verified eSewa top-up");
+    await tx.ledgerEntry.create({ data: { transferRef: `ESEWA-${payment.transactionUuid}`, userId: payment.userId, amountPaisa: payment.amountPaisa, direction: "CREDIT", description: "Verified eSewa wallet top-up" } });
+  });
+}
+
 // Public eSewa return URL. A browser redirect is not trusted as payment proof:
 // verify the signed payload and independently query eSewa's status API.
 router.get("/esewa/success", async (req, res) => {
@@ -25,13 +39,11 @@ router.get("/esewa/success", async (req, res) => {
     }
     const verified = await checkEsewaStatus({ transactionUuid: payment.transactionUuid, totalAmount: paisaToAmount(payment.amountPaisa) });
     if (verified.status === "COMPLETE") {
-      await prisma.esewaPayment.updateMany({
-        where: { id: payment.id, status: "PENDING" },
-        data: { status: "COMPLETE", providerRef: verified.refId || response.transaction_code || null }
-      });
-      return res.status(200).send("eSewa payment verified. You may return to the app and refresh payment status.");
+      if (process.env.ESEWA_WALLET_TOPUP_ENABLED !== "true") return res.status(503).send("Payment verified by eSewa, but wallet crediting is disabled. Contact support; do not pay again.");
+      await settleEsewaTopUp(payment.id, verified.refId || response.transaction_code);
+      return res.status(200).send("eSewa payment verified and wallet credited. You may return to the app.");
     }
-    await prisma.esewaPayment.updateMany({ where: { id: payment.id, status: "PENDING" }, data: { status: verified.status } });
+    await prisma.esewaPayment.updateMany({ where: { id: payment.id, status: "PENDING" }, data: { status: verified.status, providerRef: verified.refId || null } });
     return res.status(200).send(`eSewa payment status: ${verified.status}`);
   } catch (error) {
     console.error("eSewa success verification failed", error);
@@ -78,6 +90,7 @@ router.post("/esewa/initiate", async (req: AuthRequest, res, next) => {
   const parsed = z.object({ amount: amountSchema }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Enter a valid payment amount (maximum NPR 50,000)." });
   try {
+    if (process.env.ESEWA_WALLET_TOPUP_ENABLED !== "true") return res.status(503).json({ error: "eSewa wallet top-ups are disabled. Enable ESEWA_WALLET_TOPUP_ENABLED only after merchant and regulatory approval." });
     const amountPaisa = BigInt(Math.round(parsed.data.amount * 100));
     const transactionUuid = randomUUID();
     const productCode = getEsewaProductCode();
@@ -110,11 +123,10 @@ router.get("/esewa/status/:transactionUuid", async (req: AuthRequest, res, next)
         totalAmount: paisaToAmount(payment.amountPaisa)
       });
       const nextStatus = verified.status;
-      if (["COMPLETE", "PENDING", "FULL_REFUND", "PARTIAL_REFUND", "AMBIGUOUS", "NOT_FOUND", "CANCELED"].includes(nextStatus)) {
-        await prisma.esewaPayment.updateMany({
-          where: { id: payment.id, status: "PENDING" },
-          data: { status: nextStatus, providerRef: verified.refId || null }
-        });
+      if (nextStatus === "COMPLETE") {
+        if (process.env.ESEWA_WALLET_TOPUP_ENABLED === "true") await settleEsewaTopUp(payment.id, verified.refId);
+      } else if (["PENDING", "FULL_REFUND", "PARTIAL_REFUND", "AMBIGUOUS", "NOT_FOUND", "CANCELED"].includes(nextStatus)) {
+        await prisma.esewaPayment.updateMany({ where: { id: payment.id, status: "PENDING" }, data: { status: nextStatus, providerRef: verified.refId || null } });
       }
     }
     const latest = await prisma.esewaPayment.findUnique({ where: { id: payment.id } });
@@ -123,7 +135,8 @@ router.get("/esewa/status/:transactionUuid", async (req: AuthRequest, res, next)
       amount: paisaToAmount(payment.amountPaisa),
       status: latest?.status || payment.status,
       providerReference: latest?.providerRef || null,
-      note: "This records merchant checkout status only; it does not credit a regulated wallet balance."
+      walletCredited: latest?.status === "COMPLETE" && process.env.ESEWA_WALLET_TOPUP_ENABLED === "true",
+      note: "Wallet credit occurs only after independent eSewa verification and only when the merchant-approved top-up feature flag is enabled."
     });
   } catch (error) { next(error); }
 });
