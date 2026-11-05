@@ -108,3 +108,18 @@ model AuditEvent {
   actor User @relation("AuditActor", fields: [actorId], references: [id])
   @@index([targetType, targetId, createdAt])
 }
+
+
+model EsewaPayment {
+  id String @id @default(cuid())
+  userId String
+  transactionUuid String @unique
+  amountPaisa BigInt
+  productCode String
+  status String @default("PENDING")
+  providerRef String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
