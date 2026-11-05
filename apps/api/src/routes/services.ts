@@ -3,7 +3,44 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { prisma } from "../index";
 import { AuthRequest, requireAuth } from "../middleware/auth";
+import { checkEsewaStatus, createEsewaForm, decodeAndVerifyEsewaResponse, getEsewaProductCode } from "../payments/esewa";
 const router = Router();
+
+function paisaToAmount(paisa: bigint) {
+  return `${paisa / 100n}.${String(paisa % 100n).padStart(2, "0")}`;
+}
+
+// Public eSewa return URL. A browser redirect is not trusted as payment proof:
+// verify the signed payload and independently query eSewa's status API.
+router.get("/esewa/success", async (req, res) => {
+  try {
+    const encoded = typeof req.query.data === "string" ? req.query.data : "";
+    if (!encoded) return res.status(400).send("Missing eSewa response data");
+    const response = decodeAndVerifyEsewaResponse(encoded);
+    const payment = await prisma.esewaPayment.findUnique({ where: { transactionUuid: response.transaction_uuid } });
+    if (!payment) return res.status(404).send("Payment reference not found");
+    if (response.product_code !== payment.productCode || response.product_code !== getEsewaProductCode() ||
+        Math.round(Number(response.total_amount) * 100) !== Number(payment.amountPaisa)) {
+      return res.status(400).send("eSewa response does not match the stored payment");
+    }
+    const verified = await checkEsewaStatus({ transactionUuid: payment.transactionUuid, totalAmount: paisaToAmount(payment.amountPaisa) });
+    if (verified.status === "COMPLETE") {
+      await prisma.esewaPayment.updateMany({
+        where: { id: payment.id, status: "PENDING" },
+        data: { status: "COMPLETE", providerRef: verified.refId || response.transaction_code || null }
+      });
+      return res.status(200).send("eSewa payment verified. You may return to the app and refresh payment status.");
+    }
+    await prisma.esewaPayment.updateMany({ where: { id: payment.id, status: "PENDING" }, data: { status: verified.status } });
+    return res.status(200).send(`eSewa payment status: ${verified.status}`);
+  } catch (error) {
+    console.error("eSewa success verification failed", error);
+    return res.status(400).send("Could not verify eSewa payment. Contact support with your transaction reference.");
+  }
+});
+
+router.get("/esewa/failure", (_req, res) => res.status(200).send("eSewa payment was cancelled, failed, or is still pending. Check the payment status in the app."));
+
 router.use(requireAuth);
 const amountSchema = z.number().positive().max(50000).refine(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8);
 async function debit(userId: string, amount: number, description: string) {
@@ -17,6 +54,61 @@ async function debit(userId: string, amount: number, description: string) {
     return ref;
   });
 }
+
+
+router.post("/esewa/initiate", async (req: AuthRequest, res, next) => {
+  const parsed = z.object({ amount: amountSchema }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Enter a valid payment amount (maximum NPR 50,000)." });
+  try {
+    const amountPaisa = BigInt(Math.round(parsed.data.amount * 100));
+    const transactionUuid = randomUUID();
+    const productCode = getEsewaProductCode();
+    const payment = await prisma.esewaPayment.create({
+      data: { userId: req.userId!, transactionUuid, amountPaisa, productCode }
+    });
+    const checkout = createEsewaForm({ amount: paisaToAmount(amountPaisa), transactionUuid });
+    res.status(201).json({
+      paymentId: payment.id,
+      transactionUuid,
+      amount: paisaToAmount(amountPaisa),
+      status: payment.status,
+      actionUrl: checkout.actionUrl,
+      method: "POST",
+      fields: checkout.fields,
+      message: "Submit these form fields to eSewa checkout. Payment remains pending until server-side verification."
+    });
+  } catch (error) { next(error); }
+});
+
+router.get("/esewa/status/:transactionUuid", async (req: AuthRequest, res, next) => {
+  try {
+    const payment = await prisma.esewaPayment.findFirst({
+      where: { transactionUuid: req.params.transactionUuid, userId: req.userId! }
+    });
+    if (!payment) return res.status(404).json({ error: "Payment not found" });
+    if (payment.status === "PENDING") {
+      const verified = await checkEsewaStatus({
+        transactionUuid: payment.transactionUuid,
+        totalAmount: paisaToAmount(payment.amountPaisa)
+      });
+      const nextStatus = verified.status;
+      if (["COMPLETE", "PENDING", "FULL_REFUND", "PARTIAL_REFUND", "AMBIGUOUS", "NOT_FOUND", "CANCELED"].includes(nextStatus)) {
+        await prisma.esewaPayment.updateMany({
+          where: { id: payment.id, status: "PENDING" },
+          data: { status: nextStatus, providerRef: verified.refId || null }
+        });
+      }
+    }
+    const latest = await prisma.esewaPayment.findUnique({ where: { id: payment.id } });
+    res.json({
+      transactionUuid: payment.transactionUuid,
+      amount: paisaToAmount(payment.amountPaisa),
+      status: latest?.status || payment.status,
+      providerReference: latest?.providerRef || null,
+      note: "This records merchant checkout status only; it does not credit a regulated wallet balance."
+    });
+  } catch (error) { next(error); }
+});
 
 router.post("/cash-in", async (req: AuthRequest, res, next) => {
  const p=z.object({amount:amountSchema,method:z.enum(["BANK_TRANSFER","COUNTER_DEPOSIT"]),reference:z.string().max(80).optional()}).safeParse(req.body);
