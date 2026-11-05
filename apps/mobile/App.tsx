@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { formatNpr, request, Session, setAccessToken } from "./src/api";
 type Tx = { id: string; direction: string; amountPaisa: string; description?: string; createdAt: string; counterparty?: { name: string; email: string } | null };
 const notify = (message: string) => Platform.OS === "web" ? window.alert(message) : Alert.alert("Wallet Nepal", message);
@@ -8,7 +8,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
   const [recipientEmail, setRecipientEmail] = useState(""); const [amount, setAmount] = useState(""); const [note, setNote] = useState("");
-  const [transactions, setTransactions] = useState<Tx[]>([]); const [busy, setBusy] = useState(false);
+  const [transactions, setTransactions] = useState<Tx[]>([]); const [busy, setBusy] = useState(false); const [esewaAmount,setEsewaAmount]=useState(""); const [esewaTxn,setEsewaTxn]=useState("");
   const [qrAmount,setQrAmount]=useState(""); const [qrCode,setQrCode]=useState(""); const [payQrCode,setPayQrCode]=useState("");
   const [phone,setPhone]=useState(""); const [serviceAmount,setServiceAmount]=useState(""); const [billAmount,setBillAmount]=useState(""); const [customerRef,setCustomerRef]=useState("");
   const [kycName,setKycName]=useState(""); const [kycDob,setKycDob]=useState(""); const [kycDoc,setKycDoc]=useState(""); const [kycAddress,setKycAddress]=useState(""); const [adminSummary,setAdminSummary]=useState(""); const [adminKyc,setAdminKyc]=useState<any[]>([]); const [cashAmount,setCashAmount]=useState(""); const [cashOutAmount,setCashOutAmount]=useState(""); const [cashDestination,setCashDestination]=useState(""); const [adminCash,setAdminCash]=useState<any[]>([]); const [amlCases,setAmlCases]=useState<any[]>([]);
@@ -31,6 +31,18 @@ export default function App() {
   async function submitKyc(){ await action("/api/services/kyc",{fullName:kycName,dateOfBirth:kycDob,documentType:"CITIZENSHIP",documentNumber:kycDoc,address:kycAddress}); }
   async function cashIn(){await action("/api/services/cash-in",{amount:Number(cashAmount),method:"BANK_TRANSFER"});}
   async function cashOut(){await action("/api/services/cash-out",{amount:Number(cashOutAmount),method:"BANK_TRANSFER",destination:cashDestination});}
+  async function startEsewaPayment(){
+    try {
+      const result=await request<any>("/api/services/esewa/initiate",{method:"POST",body:JSON.stringify({amount:Number(esewaAmount)})});
+      setEsewaTxn(result.transactionUuid);
+      await Linking.openURL(`${API_URL}/api/services/esewa/checkout/${encodeURIComponent(result.transactionUuid)}`);
+    } catch(e) { notify((e as Error).message); }
+  }
+  async function checkEsewaPayment(){
+    if(!esewaTxn)return;
+    try { const result=await request<any>(`/api/services/esewa/status/${encodeURIComponent(esewaTxn)}`); notify(`eSewa status: ${result.status}`); }
+    catch(e) { notify((e as Error).message); }
+  }
   async function loadAdmin(){ try { const r=await request<any>("/api/admin/overview"); const k=await request<any>("/api/admin/kyc"); const cash=await request<any>("/api/admin/cash-requests"); const aml=await request<any>("/api/admin/aml-cases"); setAdminSummary(`Users: ${r.users} · Pending KYC: ${r.pendingKyc} · Pending QR: ${r.pendingQrPayments}`); setAdminKyc(k.applications); setAdminCash(cash.requests); setAmlCases(aml.cases); } catch(e){notify((e as Error).message);} }
   async function reviewCash(id:string,status:"APPROVED"|"REJECTED"){try{await request(`/api/admin/cash-requests/${id}`,{method:"PATCH",body:JSON.stringify({status})});await loadAdmin();}catch(e){notify((e as Error).message);}}
   async function updateAml(id:string,status:"UNDER_REVIEW"|"CLEARED"|"ESCALATED"){try{await request(`/api/admin/aml-cases/${id}`,{method:"PATCH",body:JSON.stringify({status})});await loadAdmin();}catch(e){notify((e as Error).message);}}
@@ -73,6 +85,7 @@ export default function App() {
       <TouchableOpacity disabled={busy} onPress={sendTransfer} style={styles.primary}><Text style={styles.primaryText}>{busy ? "Processing…" : "Send demo transfer"}</Text></TouchableOpacity>
     </View>
 
+    <Text style={styles.sectionTitle}>Pay with eSewa</Text><View style={styles.card}><Field label="Payment amount (NPR)" value={esewaAmount} onChangeText={setEsewaAmount} keyboardType="decimal-pad"/><TouchableOpacity style={styles.primary} onPress={startEsewaPayment}><Text style={styles.primaryText}>Continue to eSewa</Text></TouchableOpacity>{esewaTxn ? <><Text style={styles.muted}>Transaction: {esewaTxn}</Text><TouchableOpacity style={styles.primary} onPress={checkEsewaPayment}><Text style={styles.primaryText}>Check eSewa payment status</Text></TouchableOpacity></> : null}<Text style={styles.muted}>Merchant checkout only. This does not top up your demo wallet.</Text></View>
     <Text style={styles.sectionTitle}>Cash in / cash out</Text><View style={styles.card}><Field label="Cash-in amount (NPR)" value={cashAmount} onChangeText={setCashAmount} keyboardType="decimal-pad"/><TouchableOpacity style={styles.primary} onPress={cashIn}><Text style={styles.primaryText}>Request cash-in</Text></TouchableOpacity><Field label="Cash-out amount (NPR)" value={cashOutAmount} onChangeText={setCashOutAmount} keyboardType="decimal-pad"/><Field label="Bank account / payout destination" value={cashDestination} onChangeText={setCashDestination}/><TouchableOpacity style={styles.primary} onPress={cashOut}><Text style={styles.primaryText}>Request cash-out</Text></TouchableOpacity><Text style={styles.muted}>Requests need admin approval. No real bank transfer or cash payout occurs.</Text></View>
     <Text style={styles.sectionTitle}>QR payments · Recharge · Bills · KYC</Text>
     <View style={styles.card}>
@@ -111,7 +124,7 @@ export default function App() {
         <View style={{ flex: 1 }}><Text style={styles.txTitle}>{tx.description || "Wallet transfer"}</Text><Text style={styles.muted}>{new Date(tx.createdAt).toLocaleString()}</Text></View>
         <Text style={[styles.txAmount, tx.direction === "CREDIT" ? styles.credit : styles.debit]}>{tx.direction === "CREDIT" ? "+" : "−"}{formatNpr(tx.amountPaisa)}</Text>
       </View>)}
-    </View><Text style={styles.disclaimer}>QR payment, mobile top-up, bills and real payment rails are not connected. Demo only.</Text>
+    </View><Text style={styles.disclaimer}>QR, recharge, bills and cash operations remain demo-only. eSewa checkout records merchant payment status but does not add wallet balance.</Text>
   </ScrollView></SafeAreaView>;
 }
 function Field(props: any) { return <View style={styles.field}><Text style={styles.label}>{props.label}</Text><TextInput {...props} autoCapitalize="none" placeholderTextColor="#9aa79f" style={styles.input} /></View>; }
