@@ -114,3 +114,21 @@ A production wallet in Nepal requires legal/regulatory assessment, applicable Ne
 - Complete legal, privacy, KYC/AML and operational reviews.
 
 This repository is a development starter, not a licensed financial service or production-ready store of value.
+
+
+## Added demo modules
+- QR payment request creation and QR-code-string payment between demo wallets.
+- NTC/Ncell/SmartCell recharge request endpoint (currently debits demo credits only; does not deliver airtime).
+- NEA electricity, drinking-water and internet bill request endpoint (currently demo debit only; does not settle a real bill).
+- KYC application form and status workflow (test data only; no document image upload or identity verification).
+- Admin overview, user list and KYC review API. Admin role must be assigned manually by a trusted operator directly in the database; never expose public admin self-registration.
+
+### New API routes
+- `POST /api/services/qr/create`, `POST /api/services/qr/pay`
+- `POST /api/services/recharge`, `POST /api/services/bills`
+- `POST /api/services/kyc`, `GET /api/services/kyc`
+- `GET /api/admin/overview`, `GET /api/admin/kyc`, `PATCH /api/admin/kyc/:id`, `GET /api/admin/users`
+
+Run `npm run db:generate && npm run db:migrate` after pulling these schema changes. For local admin testing, assign `role = 'ADMIN'` to a trusted test user in PostgreSQL manually. The app exposes a small admin overview panel only to ADMIN accounts; detailed admin APIs are available for a future dedicated dashboard UI.
+
+**Critical:** these are sandbox workflows. QR payment codes are not rendered as scannable QR images yet; the current UI shares a code string. Recharge and bill routes debit demo credits but do not contact telecom or utility providers. KYC stores entered test fields and is not compliant identity verification. Do not enter real identity data or real funds. Before production, add provider integrations, signed callbacks/webhooks, idempotency, audit logs, role-based admin controls, KYC document storage with encryption/access controls, privacy/retention policies, independent security testing, and Nepal regulatory/legal review.
