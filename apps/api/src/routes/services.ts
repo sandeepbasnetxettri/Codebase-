@@ -20,7 +20,7 @@ function amountToPaisa(value: string): bigint | null {
 // share one database transaction, so partial settlement rolls back.
 async function settleEsewaTopUp(paymentId: string, providerRef?: string) {
   await prisma.$transaction(async tx => {
-    const claimed = await tx.esewaPayment.updateMany({ where: { id: paymentId, status: "PENDING" }, data: { status: "COMPLETE", providerRef: providerRef || null } });
+    const claimed = await tx.esewaPayment.updateMany({ where: { id: paymentId, status: { in: ["PENDING", "COMPLETE"] }, walletCredited: false }, data: { status: "COMPLETE", walletCredited: true, providerRef: providerRef || null } });
     if (claimed.count !== 1) return;
     const payment = await tx.esewaPayment.findUnique({ where: { id: paymentId } });
     if (!payment) throw new Error("eSewa payment disappeared during settlement");
