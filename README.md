@@ -132,3 +132,21 @@ This repository is a development starter, not a licensed financial service or pr
 Run `npm run db:generate && npm run db:migrate` after pulling these schema changes. For local admin testing, assign `role = 'ADMIN'` to a trusted test user in PostgreSQL manually. The app exposes a small admin overview panel only to ADMIN accounts; detailed admin APIs are available for a future dedicated dashboard UI.
 
 **Critical:** these are sandbox workflows. QR payment codes are not rendered as scannable QR images yet; the current UI shares a code string. Recharge and bill routes debit demo credits but do not contact telecom or utility providers. KYC stores entered test fields and is not compliant identity verification. Do not enter real identity data or real funds. Before production, add provider integrations, signed callbacks/webhooks, idempotency, audit logs, role-based admin controls, KYC document storage with encryption/access controls, privacy/retention policies, independent security testing, and Nepal regulatory/legal review.
+
+
+## Cash operations, AML review and admin controls (sandbox)
+Cash-in and cash-out requests are created as pending records. Admin approval changes the demo wallet ledger; it does not cause a bank transfer or physical cash disbursement. Basic high-value flags create manual-review AML cases. Admins can review cash requests and AML cases, suspend/freeze accounts, and inspect audit events.
+
+Added routes:
+- POST /api/services/cash-in
+- POST /api/services/cash-out
+- GET /api/services/cash-requests
+- GET /api/admin/cash-requests and PATCH /api/admin/cash-requests/:id
+- GET /api/admin/aml-cases and PATCH /api/admin/aml-cases/:id
+- PATCH /api/admin/users/:id/status
+- GET /api/admin/audit
+
+This is only workflow scaffolding. Rule-based high-value flags are not a compliant AML program and do not perform sanctions/PEP screening, suspicious activity reporting, or regulatory monitoring. Do not use real customer data or funds.
+
+## Approved payment provider integration
+The provider adapter is intentionally a boundary only. A real implementation cannot be safely completed without the exact provider, approved merchant agreement, official API documentation, sandbox credentials, signing/webhook specification and settlement/reconciliation rules. Do not send credentials in chat or commit them to Git. Never treat a browser redirect or client-side callback as proof of payment.
