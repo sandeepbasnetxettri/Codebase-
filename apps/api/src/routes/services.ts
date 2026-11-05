@@ -123,7 +123,7 @@ router.get("/esewa/status/:transactionUuid", async (req: AuthRequest, res, next)
       where: { transactionUuid: req.params.transactionUuid, userId: req.userId! }
     });
     if (!payment) return res.status(404).json({ error: "Payment not found" });
-    if (payment.status === "PENDING") {
+    if (payment.status === "PENDING" || (payment.status === "COMPLETE" && !payment.walletCredited)) {
       const verified = await checkEsewaStatus({
         transactionUuid: payment.transactionUuid,
         totalAmount: paisaToAmount(payment.amountPaisa)
@@ -141,7 +141,7 @@ router.get("/esewa/status/:transactionUuid", async (req: AuthRequest, res, next)
       amount: paisaToAmount(payment.amountPaisa),
       status: latest?.status || payment.status,
       providerReference: latest?.providerRef || null,
-      walletCredited: latest?.status === "COMPLETE" && process.env.ESEWA_WALLET_TOPUP_ENABLED === "true",
+      walletCredited: latest?.walletCredited || false,
       note: "Wallet credit occurs only after independent eSewa verification and only when the merchant-approved top-up feature flag is enabled."
     });
   } catch (error) { next(error); }
