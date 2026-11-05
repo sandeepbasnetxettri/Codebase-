@@ -165,6 +165,7 @@ ESEWA_ENV=sandbox
 ESEWA_PRODUCT_CODE=EPAYTEST
 ESEWA_SECRET_KEY=your-eSewa-issued-secret
 API_PUBLIC_URL=https://your-public-api-domain.example
+ESEWA_WALLET_TOPUP_ENABLED=false
 ```
 
 Use the sandbox product code and secret supplied in eSewa's official UAT documentation for testing. For production, use only the product code and secret issued for your approved merchant account and set `ESEWA_ENV=production`. Keep the secret only in the API runtime environment/secret manager; never put it in Expo variables, source code, or Git.
@@ -187,4 +188,4 @@ npm run db:migrate
 
 ### Important scope and limits
 
-This integration records the result of a merchant ePay checkout. **It does not credit the user's wallet balance**, perform cash-in settlement, or prove that this independent app is authorized to operate a stored-value wallet. eSewa ePay is a merchant collection flow; wallet funding/disbursement requires separate legal/regulatory approval and settlement design. Do not accept real customer funds until eSewa approves the merchant use case and the app has passed security, reconciliation, and Nepal regulatory reviews. The code has been committed but has not yet been installed, compiled, migrated, or tested against the eSewa sandbox.
+When `ESEWA_WALLET_TOPUP_ENABLED=true`, a verified `COMPLETE` payment credits the user's wallet and creates a credit ledger entry in the same database transaction. A conditional payment-state transition makes settlement idempotent: callback/status-check races or repeated requests cannot credit the same transaction twice. The flag defaults to `false`; initiation is blocked until an operator deliberately enables it. **Do not enable wallet top-ups for real funds unless eSewa has approved this exact merchant use case and the required Nepal regulatory authorization/licensed-partner arrangement is in place.** eSewa ePay is a merchant collection flow, not a general-purpose P2P wallet API. This code still requires dependency installation, TypeScript build, Prisma migration, sandbox end-to-end testing, reconciliation, security review, and legal/regulatory approval before any production use.
